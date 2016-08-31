@@ -5,17 +5,23 @@
  * removing and manipulation of points. A point in a segment of zero length
  */
 define([
-  "peaks/waveform/waveform.mixins",
-  "konva"
-], function (mixins, Konva) {
+  'peaks/waveform/waveform.mixins',
+  'konva'
+], function(mixins, Konva) {
+  'use strict';
 
-  return function (peaks) {
+  return function(peaks) {
     var self = this;
     var waveformView = peaks.waveform;
 
     self.points = [];
 
-    self.views = [waveformView.waveformZoomView, waveformView.waveformOverview].map(function(view){
+    var views = [
+      waveformView.waveformZoomView,
+      waveformView.waveformOverview
+    ];
+
+    self.views = views.map(function(view) {
       if (!view.pointLayer) {
         view.pointLayer = new Konva.Layer();
         view.stage.add(view.pointLayer);
@@ -25,18 +31,32 @@ define([
       return view;
     });
 
+    var pointId = 0;
+
     function constructPoint(point) {
+      if (point.id === undefined || point.id === null) {
+        point.id = 'peaks.point.' + pointId++;
+      }
+
+      point.editable = Boolean(point.editable);
+
       var pointZoomGroup = new Konva.Group();
       var pointOverviewGroup = new Konva.Group();
       var pointGroups = [pointZoomGroup, pointOverviewGroup];
 
-      point.editable = Boolean(point.editable);
-
-      pointGroups.forEach(function(pointGroup, i){
+      pointGroups.forEach(function(pointGroup, i) {
         var view = self.views[i];
 
         if (point.editable) {
-          pointGroup.marker = new peaks.options.pointMarker(true, pointGroup, point, pointHandleDrag, peaks.options.pointDblClickHandler, peaks.options.pointDragEndHandler);
+          pointGroup.marker = new peaks.options.pointMarker(
+            true,
+            pointGroup,
+            point,
+            pointHandleDrag,
+            peaks.options.pointDblClickHandler,
+            peaks.options.pointDragEndHandler
+          );
+
           pointGroup.add(pointGroup.marker);
         }
 
@@ -53,34 +73,48 @@ define([
 
     function updatePoint(point) {
       // Binding with data
-      waveformView.waveformOverview.data.set_point(waveformView.waveformOverview.data.at_time(point.timestamp), point.id);
-      waveformView.waveformZoomView.data.set_point(waveformView.waveformZoomView.data.at_time(point.timestamp), point.id);
+      waveformView.waveformOverview.data.set_point(
+        waveformView.waveformOverview.data.at_time(point.timestamp),
+        point.id
+      );
+
+      waveformView.waveformZoomView.data.set_point(
+        waveformView.waveformZoomView.data.at_time(point.timestamp),
+        point.id
+      );
 
       // Overview
-      var overviewtimestampOffset = waveformView.waveformOverview.data.at_time(point.timestamp);
+      var overviewTimestampOffset =
+        waveformView.waveformOverview.data.at_time(point.timestamp);
 
       if (point.editable) {
-        if (point.overview.marker) point.overview.marker.show().setX(overviewtimestampOffset - point.overview.marker.getWidth());
+        if (point.overview.marker) {
+          point.overview.marker.show().setX(
+            overviewTimestampOffset - point.overview.marker.getWidth()
+          );
+        }
 
         // Change Text
         point.overview.marker.label.setText(mixins.niceTime(point.timestamp, false));
       }
 
       // Zoom
-      var zoomtimestampOffset = waveformView.waveformZoomView.data.at_time(point.timestamp);
+      var zoomTimestampOffset = waveformView.waveformZoomView.data.at_time(point.timestamp);
       var frameStartOffset = waveformView.waveformZoomView.frameOffset;
 
-      if (zoomtimestampOffset < frameStartOffset) {
-        zoomStartOffset = frameStartOffset;
+      if (zoomTimestampOffset < frameStartOffset) {
+        zoomTimestampOffset = frameStartOffset;
       }
 
       if (waveformView.waveformZoomView.data.points[point.id].visible) {
-        var startPixel = zoomtimestampOffset - frameStartOffset;
+        var startPixel = zoomTimestampOffset - frameStartOffset;
 
         point.zoom.show();
 
         if (point.editable) {
-          if (point.zoom.marker) point.zoom.marker.show().setX(startPixel - point.zoom.marker.getWidth());
+          if (point.zoom.marker) {
+            point.zoom.marker.show().setX(startPixel - point.zoom.marker.getWidth());
+          }
 
           // Change Text
           point.zoom.marker.label.setText(mixins.niceTime(point.timestamp, false));
@@ -93,7 +127,10 @@ define([
 
     function pointHandleDrag(thisPoint, point) {
       if (thisPoint.marker.getX() > 0) {
-        var inOffset = thisPoint.view.frameOffset + thisPoint.marker.getX() + thisPoint.marker.getWidth();
+        var inOffset = thisPoint.view.frameOffset +
+                       thisPoint.marker.getX() +
+                       thisPoint.marker.getWidth();
+
         point.timestamp = thisPoint.view.data.time(inOffset);
       }
 
@@ -101,40 +138,73 @@ define([
       self.render();
     }
 
-    this.init = function () {
-      peaks.on("waveform_zoom_displaying", self.updatePoints.bind(self));
-      peaks.emit("points.ready");
+    this.init = function() {
+      peaks.on('waveform_zoom_displaying', self.updatePoints.bind(self));
+      peaks.emit('points.ready');
     };
 
-    this.updatePoints = function () {
+    this.updatePoints = function() {
       self.points.forEach(updatePoint);
       self.render();
     };
 
-    this.createPoint = function (point) {
-
-      if ((point.timestamp >= 0) === false) {
-        throw new RangeError("[waveform.points.createPoint] timestamp should be a >=0 value");
+    this.createPoint = function(point) {
+      if (typeof point.timestamp !== 'number') {
+        throw new TypeError('[waveform.points.createPoint] timestamp should be a numeric value \'' + typeof point.timestamp + '\': ' + point.typestamp);
       }
 
-      point.id = "point" + self.points.length;
+      if (isNaN(point.timestamp)) {
+        throw new TypeError('[waveform.points.createPoint] timestamp must be a numeric value');
+      }
+
+      if (point.timestamp < 0) {
+        throw new RangeError('[waveform.points.createPoint] timestamp should be a >=0 value');
+      }
 
       point = constructPoint(point);
       updatePoint(point);
       self.points.push(point);
     };
 
-    this.remove = function removePoint(point) {
+    this.getPoints = function getPoints() {
+      return this.points;
+    };
+
+    this.add = function addPoint(pointOrPoints) {
+      var points = Array.isArray(arguments[0]) ?
+                   arguments[0] :
+                   Array.prototype.slice.call(arguments);
+
+      if (typeof points[0] === 'number') {
+        peaks.options.deprecationLogger('[Peaks.points.add] Passing spread-arguments to `add` is deprecated, please pass a single object.');
+
+        points = [{
+          timestamp: arguments[0],
+          editable:  arguments[1],
+          color:     arguments[2],
+          labelText: arguments[3]
+        }];
+      }
+
+      points.forEach(this.createPoint.bind(this));
+      this.render();
+    };
+
+    /**
+     * @private
+     */
+    this._remove = function _removePoint(point) {
       var index = null;
 
-      this.points.some(function(p, i){
-        if (p === point){
+      this.points.some(function(p, i) {
+        if (p === point) {
           index = i;
+
           return true;
         }
       });
 
-      if (typeof index === 'number'){
+      if (index !== null) {
         point.overview.destroy();
         point.zoom.destroy();
       }
@@ -142,8 +212,36 @@ define([
       return index;
     };
 
-    this.removeAll = function removeAllPoints(){
-      this.views.forEach(function(view){
+    this.remove = function removePoint(point) {
+      var index = this._remove(point);
+
+      if (index === null) {
+        throw new RangeError('Unable to find the requested point' + String(point));
+      }
+
+      this.render();
+
+      return this.points.splice(index, 1).pop();
+    };
+
+    this.removeByTime = function removePointByTime(timestamp) {
+      var matchingPoints = this.points.filter(function(point) {
+        return point.timestamp === timestamp;
+      });
+
+      matchingPoints.forEach(this.remove.bind(this));
+
+      return matchingPoints.length;
+    };
+
+    this.removeById = function removePointById(pointId) {
+      this.points.filter(function(point) {
+        return point.id === pointId;
+      }).forEach(this.remove.bind(this));
+    };
+
+    this.removeAll = function removeAllPoints() {
+      this.views.forEach(function(view) {
         view.pointLayer.removeChildren();
       });
 
@@ -158,8 +256,8 @@ define([
      * @api
      * @since 0.3.0
      */
-    this.render = function renderPoints(){
-      self.views.forEach(function(view){
+    this.render = function renderPoints() {
+      self.views.forEach(function(view) {
         view.pointLayer.draw();
       });
     };

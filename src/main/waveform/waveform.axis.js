@@ -6,7 +6,7 @@
  * instantiated meaning this code is reused multiple times.
  *
  */
-define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
+define(['peaks/waveform/waveform.mixins', 'konva'], function(mixins, Konva) {
   'use strict';
 
   /*
@@ -18,6 +18,7 @@ define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
 
   function roundUpToNearest(value, multiple) {
     var remainder = value % multiple;
+
     if (remainder === 0) {
       return value;
     }
@@ -59,8 +60,9 @@ define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
     for (;;) {
       secs = baseSecs * steps[index];
       var pixels = this.view.data.at_time(secs);
+
       if (pixels < minSpacing) {
-        if (++index == steps.length) {
+        if (++index === steps.length) {
           baseSecs *= 60; // seconds -> minutes -> hours
           index = 0;
         }
@@ -69,16 +71,16 @@ define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
         break;
       }
     }
+
     return secs;
   };
-
 
   /**
    *
    * @param {WaveformOverview|WaveformZoomview} view
    * @param {Konva.Context} context
    */
-  WaveformAxis.prototype.axisDrawFunction = function (view, context) {
+  WaveformAxis.prototype.axisDrawFunction = function(view, context) {
     var currentFrameStartTime = view.data.time(view.frameOffset);
 
     // Draw axis markers
@@ -100,10 +102,10 @@ define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
     context.setAttr('lineWidth', 1);
 
     // Set text style
-    context.setAttr('font', "11px sans-serif");
+    context.setAttr('font', '11px sans-serif');
     context.setAttr('fillStyle', this.view.options.axisLabelColor);
-    context.setAttr('textAlign', "left");
-    context.setAttr('textBaseline', "bottom");
+    context.setAttr('textAlign', 'left');
+    context.setAttr('textBaseline', 'bottom');
 
     var secs = firstAxisLabelSecs;
     var x;
@@ -125,7 +127,8 @@ define(["peaks/waveform/waveform.mixins", "konva"], function (mixins, Konva) {
       context.stroke();
 
       var label      = mixins.niceTime(secs, true);
-      var labelWidth = context._context.measureText(label).width; // todo handle this with Konva.Text
+      // TODO: handle this with Konva.Text:
+      var labelWidth = context._context.measureText(label).width;
       var labelX     = x - labelWidth / 2;
       var labelY     = this.view.height - 1 - markerHeight;
 
